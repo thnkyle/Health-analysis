@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from models import DataType, HealthRecord
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
+MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 
 
 def _get_client() -> anthropic.Anthropic:
