@@ -7,7 +7,6 @@ data class HealthDataRecord(
     val value: Double,
     val unit: String,
     @SerializedName("recorded_at") val recordedAt: String,
-    @SerializedName("user_id") val userId: String = "",
     @SerializedName("metadata_json") val metadataJson: String = "{}"
 )
 
@@ -18,4 +17,14 @@ data class SyncRequest(
 data class SyncResponse(
     val inserted: Int,
     val message: String
+)
+
+data class AuthRequest(
+    val username: String,
+    val password: String
+)
+
+data class AuthResponse(
+    @SerializedName("access_token") val accessToken: String,
+    @SerializedName("token_type") val tokenType: String
 )

@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from database import init_db
-from routers import analysis, ingest
+from routers import analysis, auth_router, ingest
 
 
 @asynccontextmanager
@@ -22,6 +22,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(auth_router.router, prefix="/api/v1", tags=["auth"])
 app.include_router(ingest.router, prefix="/api/v1", tags=["ingest"])
 app.include_router(analysis.router, prefix="/api/v1", tags=["analysis"])
 

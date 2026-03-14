@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 
 from pydantic import BaseModel
-from sqlalchemy import Column, DateTime, Enum, Float, Integer, String, Text
+from sqlalchemy import Column, DateTime, Enum, Float, Index, Integer, String, Text
 from sqlalchemy.sql import func
 
 from database import Base
@@ -35,10 +35,15 @@ class HealthRecord(Base):
     metadata_json = Column(Text, default="{}")
     created_at = Column(DateTime, server_default=func.now())
 
+    __table_args__ = (
+        Index("ix_user_type", "user_id", "data_type"),
+        Index("ix_user_recorded", "user_id", "recorded_at"),
+        Index("ix_user_type_recorded", "user_id", "data_type", "recorded_at"),
+    )
+
 
 # Pydantic schemas
 class HealthRecordCreate(BaseModel):
-    user_id: str
     data_type: DataType
     value: float
     unit: str

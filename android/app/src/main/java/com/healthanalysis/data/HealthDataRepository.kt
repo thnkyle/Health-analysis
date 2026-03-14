@@ -14,9 +14,6 @@ class HealthDataRepository(
     private val prefs: SharedPreferences =
         context.getSharedPreferences("health_sync", Context.MODE_PRIVATE)
 
-    private val userId: String
-        get() = prefs.getString("user_id", "default_user") ?: "default_user"
-
     fun getLastSyncTime(): Instant {
         val millis = prefs.getLong("last_sync", 0)
         return if (millis > 0) Instant.ofEpochMilli(millis) else Instant.now().minus(7, ChronoUnit.DAYS)
@@ -26,10 +23,33 @@ class HealthDataRepository(
         prefs.edit().putLong("last_sync", Instant.now().toEpochMilli()).apply()
     }
 
+    fun saveToken(token: String) {
+        prefs.edit().putString("auth_token", token).apply()
+    }
+
+    fun getToken(): String? {
+        return prefs.getString("auth_token", null)
+    }
+
+    fun saveUsername(username: String) {
+        prefs.edit().putString("username", username).apply()
+    }
+
+    fun getUsername(): String? {
+        return prefs.getString("username", null)
+    }
+
+    fun isLoggedIn(): Boolean = getToken() != null
+
+    fun logout() {
+        prefs.edit()
+            .remove("auth_token")
+            .remove("username")
+            .apply()
+    }
+
     suspend fun fetchNewRecords(): List<HealthDataRecord> {
         val since = getLastSyncTime()
-        return healthConnectManager.readAllData(since).map {
-            it.copy(userId = userId)
-        }
+        return healthConnectManager.readAllData(since)
     }
 }
