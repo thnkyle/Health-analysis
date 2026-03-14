@@ -283,6 +283,49 @@
     </div>
 </div>
 
+<div id="page-ai" class="page">
+    <div class="header">
+        <h1>AI Insights</h1>
+        <h2>Powered by Claude</h2>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button class="btn btn-primary" onclick="loadAIInsights()">Analyze Health</button>
+        <button class="btn btn-outline" onclick="loadAIAnomalies()">Detect Anomalies</button>
+    </div>
+    <div id="ai-loading" style="display:none;" class="card">
+        <div style="text-align:center; padding: 20px; color: var(--muted);">Analyzing your health data with Claude...</div>
+    </div>
+    <div id="ai-insights" style="display:none;">
+        <div class="card">
+            <h3>Summary</h3>
+            <p id="ai-summary" style="color: var(--muted); line-height: 1.5;"></p>
+        </div>
+        <div class="card" id="ai-insights-card" style="display:none;">
+            <h3>Insights</h3>
+            <div id="ai-insights-list"></div>
+        </div>
+        <div class="card" id="ai-recommendations-card" style="display:none;">
+            <h3>Recommendations</h3>
+            <div id="ai-recommendations-list"></div>
+        </div>
+        <div class="card" id="ai-risks-card" style="display:none;">
+            <h3>Risk Factors</h3>
+            <div id="ai-risks-list"></div>
+        </div>
+    </div>
+    <div id="ai-anomalies" style="display:none;">
+        <div class="card">
+            <h3>AI Analysis</h3>
+            <p id="ai-anomaly-analysis" style="color: var(--muted); line-height: 1.5;"></p>
+        </div>
+        <div class="card" id="ai-correlations-card" style="display:none;">
+            <h3>Cross-Metric Correlations</h3>
+            <div id="ai-correlations-list"></div>
+        </div>
+        <div id="ai-anomaly-list"></div>
+    </div>
+</div>
+
 <div id="page-settings" class="page">
     <div class="header">
         <h1>Settings</h1>
@@ -300,6 +343,7 @@
 <nav class="nav">
     <button class="nav-item active" data-page="dashboard"><span class="nav-icon">&#9776;</span>Dashboard</button>
     <button class="nav-item" data-page="anomalies"><span class="nav-icon">&#9888;</span>Anomalies</button>
+    <button class="nav-item" data-page="ai"><span class="nav-icon">&#10024;</span>AI</button>
     <button class="nav-item" data-page="data"><span class="nav-icon">&#43;</span>Data</button>
     <button class="nav-item" data-page="settings"><span class="nav-icon">&#9881;</span>Settings</button>
 </nav>
@@ -594,6 +638,89 @@ async function refreshRecordCount() {
         document.getElementById('record-count').textContent = records.length;
     } catch (e) {
         document.getElementById('record-count').textContent = 'Error';
+    }
+}
+
+// AI Analysis
+async function loadAIInsights() {
+    document.getElementById('ai-loading').style.display = 'block';
+    document.getElementById('ai-insights').style.display = 'none';
+    document.getElementById('ai-anomalies').style.display = 'none';
+    try {
+        const data = await apiGet('/api/v1/ai/insights');
+        document.getElementById('ai-loading').style.display = 'none';
+        document.getElementById('ai-insights').style.display = 'block';
+
+        document.getElementById('ai-summary').textContent = data.summary;
+
+        const insightsCard = document.getElementById('ai-insights-card');
+        if (data.insights && data.insights.length > 0) {
+            insightsCard.style.display = 'block';
+            document.getElementById('ai-insights-list').innerHTML = data.insights.map(i =>
+                `<div class="anomaly-item"><div class="anomaly-detail">${i}</div></div>`
+            ).join('');
+        } else { insightsCard.style.display = 'none'; }
+
+        const recsCard = document.getElementById('ai-recommendations-card');
+        if (data.recommendations && data.recommendations.length > 0) {
+            recsCard.style.display = 'block';
+            document.getElementById('ai-recommendations-list').innerHTML = data.recommendations.map(r =>
+                `<div class="anomaly-item" style="border-left-color: var(--success);"><div class="anomaly-detail">${r}</div></div>`
+            ).join('');
+        } else { recsCard.style.display = 'none'; }
+
+        const risksCard = document.getElementById('ai-risks-card');
+        if (data.risk_factors && data.risk_factors.length > 0) {
+            risksCard.style.display = 'block';
+            document.getElementById('ai-risks-list').innerHTML = data.risk_factors.map(r =>
+                `<div class="anomaly-item severe"><div class="anomaly-detail">${r}</div></div>`
+            ).join('');
+        } else { risksCard.style.display = 'none'; }
+
+        toast('AI analysis complete');
+    } catch (e) {
+        document.getElementById('ai-loading').style.display = 'none';
+        toast('AI analysis failed: ' + e.message, true);
+    }
+}
+
+async function loadAIAnomalies() {
+    document.getElementById('ai-loading').style.display = 'block';
+    document.getElementById('ai-insights').style.display = 'none';
+    document.getElementById('ai-anomalies').style.display = 'none';
+    try {
+        const data = await apiGet('/api/v1/ai/anomalies');
+        document.getElementById('ai-loading').style.display = 'none';
+        document.getElementById('ai-anomalies').style.display = 'block';
+
+        document.getElementById('ai-anomaly-analysis').textContent = data.analysis;
+
+        const corrCard = document.getElementById('ai-correlations-card');
+        if (data.correlations && data.correlations.length > 0) {
+            corrCard.style.display = 'block';
+            document.getElementById('ai-correlations-list').innerHTML = data.correlations.map(c =>
+                `<div class="anomaly-item"><div class="anomaly-detail">${c}</div></div>`
+            ).join('');
+        } else { corrCard.style.display = 'none'; }
+
+        const container = document.getElementById('ai-anomaly-list');
+        if (data.total === 0) {
+            container.innerHTML = '<div class="card"><div class="empty">No anomalies detected by AI.</div></div>';
+        } else {
+            const severityColor = s => s === 'high' ? 'severe' : s === 'medium' ? '' : '';
+            container.innerHTML = data.anomalies.map(a => `
+                <div class="anomaly-item ${severityColor(a.severity)}">
+                    <div class="anomaly-type">${(a.data_type || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} <span style="font-size:0.7rem; opacity:0.7;">[${a.severity}]</span></div>
+                    <div class="anomaly-detail">${a.reason}</div>
+                    <div class="anomaly-detail">Value: ${a.value} | ${a.recorded_at ? new Date(a.recorded_at).toLocaleString() : ''}</div>
+                </div>
+            `).join('');
+        }
+
+        toast('AI anomaly detection complete');
+    } catch (e) {
+        document.getElementById('ai-loading').style.display = 'none';
+        toast('AI anomaly detection failed: ' + e.message, true);
     }
 }
 

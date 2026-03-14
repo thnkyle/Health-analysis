@@ -99,3 +99,26 @@ class Anomaly(BaseModel):
 class AnomalyResponse(BaseModel):
     anomalies: list[Anomaly]
     total: int
+
+
+# AI-powered analysis models
+class AIHealthAnalysis(BaseModel):
+    summary: str
+    insights: list[str]
+    recommendations: list[str]
+    risk_factors: list[str]
+
+
+class AIAnomaly(BaseModel):
+    data_type: str
+    value: float | str
+    recorded_at: str
+    severity: str
+    reason: str
+
+
+class AIAnomalyResponse(BaseModel):
+    anomalies: list[AIAnomaly]
+    analysis: str
+    correlations: list[str]
+    total: int
