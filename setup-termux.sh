@@ -11,9 +11,9 @@ echo ""
 echo "[1/5] Updating Termux packages..."
 pkg update -y && pkg upgrade -y
 
-# Install Python + scientific packages via pkg (NOT pip — pip builds from source and hangs)
-echo "[2/5] Installing Python and dependencies..."
-pkg install -y python git python-numpy python-pandas
+# Install Python
+echo "[2/5] Installing Python..."
+pkg install -y python git
 
 # Clone the repo (skip if already cloned)
 echo "[3/5] Getting the project..."

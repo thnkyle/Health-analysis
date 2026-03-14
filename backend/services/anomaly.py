@@ -1,4 +1,4 @@
-import numpy as np
+import math
 from sqlalchemy.orm import Session
 
 from models import Anomaly, AnomalyResponse, DataType, HealthRecord
@@ -26,9 +26,10 @@ def detect_anomalies(
 
     anomalies = []
     for dt, group in grouped.items():
-        values = np.array([r.value for r in group])
-        mean = np.mean(values)
-        std = np.std(values)
+        values = [r.value for r in group]
+        n = len(values)
+        mean = sum(values) / n
+        std = math.sqrt(sum((v - mean) ** 2 for v in values) / n)
 
         if std == 0:
             continue
