@@ -22,8 +22,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var repository: HealthDataRepository
     private lateinit var syncService: SyncService
 
-    // TODO: Update with your backend URL
-    private val backendUrl = "http://10.0.2.2:8000/"
+    // Points to the Termux backend running on the same phone
+    private val backendUrl = "http://127.0.0.1:8000/"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
