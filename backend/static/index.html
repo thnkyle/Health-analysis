@@ -289,8 +289,8 @@
         <h2>Configuration</h2>
     </div>
     <div class="card">
-        <label>User ID</label>
-        <input type="text" id="setting-userid" value="default_user">
+        <label>Logged in as</label>
+        <div id="setting-username" style="font-size: 1rem; font-weight: 600; margin-bottom: 12px;">--</div>
         <label>Records in database</label>
         <div id="record-count" style="font-size: 1.2rem; font-weight: 600; margin-bottom: 12px;">--</div>
         <button class="btn btn-outline" onclick="refreshRecordCount()">Refresh Count</button>
@@ -308,7 +308,9 @@
 
 <script>
 const API = '';
-let userId = 'default_user';
+const LOCAL_USER = 'local_user';
+const LOCAL_PASS = 'local_device_password';
+let authToken = localStorage.getItem('auth_token') || '';
 let currentTrendType = 'steps';
 let currentGranularity = 'daily';
 let trendChart = null;
@@ -319,6 +321,34 @@ const UNITS = {
     body_temperature: 'celsius', distance: 'meters'
 };
 
+// Auto-login on load
+async function ensureLoggedIn() {
+    if (authToken) return;
+    try {
+        await fetch(API + '/api/v1/auth/register', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: LOCAL_USER, password: LOCAL_PASS })
+        });
+    } catch (e) { /* may already exist */ }
+    try {
+        const res = await fetch(API + '/api/v1/auth/login', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: LOCAL_USER, password: LOCAL_PASS })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            authToken = data.access_token;
+            localStorage.setItem('auth_token', authToken);
+        }
+    } catch (e) {
+        toast('Login failed: ' + e.message, true);
+    }
+}
+
+function authHeaders() {
+    return authToken ? { 'Authorization': 'Bearer ' + authToken } : {};
+}
+
 // Navigation
 document.querySelectorAll('.nav-item').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -328,7 +358,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
         document.getElementById('page-' + btn.dataset.page).classList.add('active');
         if (btn.dataset.page === 'dashboard') loadDashboard();
         if (btn.dataset.page === 'anomalies') loadAnomalies();
-        if (btn.dataset.page === 'settings') refreshRecordCount();
+        if (btn.dataset.page === 'settings') { document.getElementById('setting-username').textContent = LOCAL_USER; refreshRecordCount(); }
     });
 });
 
@@ -363,21 +393,20 @@ function toast(msg, isError = false) {
 }
 
 async function apiPost(path, body) {
-    const res = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
 }
 
 async function apiGet(path) {
-    const res = await fetch(API + path);
+    const res = await fetch(API + path, { headers: authHeaders() });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
 }
 
 async function loadDashboard() {
-    userId = document.getElementById('setting-userid').value || 'default_user';
     try {
-        const records = await apiGet(`/api/v1/records?user_id=${userId}&limit=1000`);
+        const records = await apiGet('/api/v1/records?limit=1000');
         if (records.length === 0) {
             document.getElementById('dash-subtitle').textContent = 'No data yet — add some records';
             return;
@@ -410,9 +439,8 @@ async function loadDashboard() {
 }
 
 async function loadTrends() {
-    userId = document.getElementById('setting-userid').value || 'default_user';
     try {
-        const data = await apiGet(`/api/v1/trends/${currentTrendType}?user_id=${userId}&granularity=${currentGranularity}`);
+        const data = await apiGet(`/api/v1/trends/${currentTrendType}?granularity=${currentGranularity}`);
         renderTrendChart(data);
     } catch (e) { /* silent */ }
 }
@@ -452,9 +480,8 @@ function renderTrendChart(data) {
 }
 
 async function loadAnomalies() {
-    userId = document.getElementById('setting-userid').value || 'default_user';
     try {
-        const data = await apiGet(`/api/v1/anomalies?user_id=${userId}`);
+        const data = await apiGet('/api/v1/anomalies');
         const container = document.getElementById('anomaly-list');
         if (data.total === 0) {
             container.innerHTML = '<div class="empty">No anomalies detected. Your data looks normal.</div>';
@@ -473,7 +500,6 @@ async function loadAnomalies() {
 }
 
 async function submitManualEntry() {
-    userId = document.getElementById('setting-userid').value || 'default_user';
     const dataType = document.getElementById('entry-type').value;
     const value = parseFloat(document.getElementById('entry-value').value);
     if (isNaN(value)) { toast('Enter a valid number', true); return; }
@@ -481,7 +507,6 @@ async function submitManualEntry() {
     try {
         await apiPost('/api/v1/sync', {
             records: [{
-                user_id: userId,
                 data_type: dataType,
                 value: value,
                 unit: UNITS[dataType] || 'unit',
@@ -496,7 +521,6 @@ async function submitManualEntry() {
 }
 
 async function handleFileUpload(e) {
-    userId = document.getElementById('setting-userid').value || 'default_user';
     const file = e.target.files[0];
     if (!file) return;
     const text = await file.text();
@@ -506,7 +530,6 @@ async function handleFileUpload(e) {
         if (file.name.endsWith('.json')) {
             const parsed = JSON.parse(text);
             records = (Array.isArray(parsed) ? parsed : parsed.records || []).map(r => ({
-                user_id: r.user_id || userId,
                 data_type: r.data_type || r.type,
                 value: parseFloat(r.value),
                 unit: r.unit || UNITS[r.data_type || r.type] || 'unit',
@@ -520,7 +543,6 @@ async function handleFileUpload(e) {
                 const row = {};
                 header.forEach((h, j) => row[h] = cols[j]);
                 records.push({
-                    user_id: row.user_id || userId,
                     data_type: row.data_type || row.type,
                     value: parseFloat(row.value),
                     unit: row.unit || UNITS[row.data_type || row.type] || 'unit',
@@ -539,7 +561,6 @@ async function handleFileUpload(e) {
 }
 
 async function loadSampleData() {
-    userId = document.getElementById('setting-userid').value || 'default_user';
     const records = [];
     const now = Date.now();
 
@@ -547,14 +568,14 @@ async function loadSampleData() {
         const date = new Date(now - d * 86400000);
         const iso = date.toISOString();
 
-        records.push({ user_id: userId, data_type: 'steps', value: 5000 + Math.random() * 10000, unit: 'count', recorded_at: iso });
-        records.push({ user_id: userId, data_type: 'heart_rate', value: 60 + Math.random() * 30, unit: 'bpm', recorded_at: iso });
-        records.push({ user_id: userId, data_type: 'sleep', value: 300 + Math.random() * 240, unit: 'minutes', recorded_at: iso });
-        records.push({ user_id: userId, data_type: 'weight', value: 70 + Math.random() * 5 - 2.5, unit: 'kg', recorded_at: iso });
-        records.push({ user_id: userId, data_type: 'calories', value: 1500 + Math.random() * 1000, unit: 'kcal', recorded_at: iso });
+        records.push({ data_type: 'steps', value: 5000 + Math.random() * 10000, unit: 'count', recorded_at: iso });
+        records.push({ data_type: 'heart_rate', value: 60 + Math.random() * 30, unit: 'bpm', recorded_at: iso });
+        records.push({ data_type: 'sleep', value: 300 + Math.random() * 240, unit: 'minutes', recorded_at: iso });
+        records.push({ data_type: 'weight', value: 70 + Math.random() * 5 - 2.5, unit: 'kg', recorded_at: iso });
+        records.push({ data_type: 'calories', value: 1500 + Math.random() * 1000, unit: 'kcal', recorded_at: iso });
 
         if (d === 3) {
-            records.push({ user_id: userId, data_type: 'heart_rate', value: 175, unit: 'bpm', recorded_at: iso });
+            records.push({ data_type: 'heart_rate', value: 175, unit: 'bpm', recorded_at: iso });
         }
     }
 
@@ -568,9 +589,8 @@ async function loadSampleData() {
 }
 
 async function refreshRecordCount() {
-    userId = document.getElementById('setting-userid').value || 'default_user';
     try {
-        const records = await apiGet(`/api/v1/records?user_id=${userId}&limit=1000`);
+        const records = await apiGet('/api/v1/records?limit=1000');
         document.getElementById('record-count').textContent = records.length;
     } catch (e) {
         document.getElementById('record-count').textContent = 'Error';
@@ -578,7 +598,7 @@ async function refreshRecordCount() {
 }
 
 // Initial load
-loadDashboard();
+ensureLoggedIn().then(() => loadDashboard());
 </script>
 </body>
 </html>
