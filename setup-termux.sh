@@ -29,7 +29,7 @@ cd "$HOME/Health-analysis/backend"
 # Install remaining Python dependencies via pip (these are pure Python, install fast)
 echo "[4/5] Installing Python dependencies..."
 pip install --upgrade pip
-pip install fastapi uvicorn sqlalchemy pydantic
+pip install "fastapi<0.100" uvicorn sqlalchemy "pydantic<2"
 
 # Start the server
 echo ""

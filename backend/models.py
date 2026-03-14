@@ -55,7 +55,8 @@ class HealthRecordResponse(BaseModel):
     recorded_at: datetime
     metadata_json: str
 
-    model_config = {"from_attributes": True}
+    class Config:
+        orm_mode = True
 
 
 class SyncRequest(BaseModel):
