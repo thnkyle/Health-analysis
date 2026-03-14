@@ -1,6 +1,7 @@
 package com.healthanalysis
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
@@ -10,7 +11,6 @@ import androidx.lifecycle.lifecycleScope
 import com.healthanalysis.data.HealthDataRepository
 import com.healthanalysis.data.SyncService
 import com.healthanalysis.ui.HomeScreen
-import com.healthanalysis.ui.LoginScreen
 import com.healthanalysis.ui.PermissionsScreen
 import com.healthanalysis.ui.SyncState
 import kotlinx.coroutines.launch
@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         repository = HealthDataRepository(this, healthConnectManager)
         syncService = SyncService(backendUrl)
 
-        // Restore token if logged in
+        // Restore token if already logged in
         repository.getToken()?.let { syncService.setToken(it) }
 
         val requestPermissions = registerForActivityResult(
@@ -41,10 +41,35 @@ class MainActivity : ComponentActivity() {
         }
 
         lifecycleScope.launch {
+            ensureLoggedIn()
             checkPermissionsAndSetContent(
                 onRequestPermissions = { requestPermissions.launch(healthConnectManager.permissions) }
             )
         }
+    }
+
+    /**
+     * Auto-registers and logs in a local user on first launch.
+     * On subsequent launches, restores the saved token.
+     */
+    private suspend fun ensureLoggedIn() {
+        if (repository.isLoggedIn()) return
+
+        val username = "local_user"
+        val password = "local_device_password"
+
+        // Try to register (will fail silently if account already exists)
+        syncService.register(username, password)
+
+        syncService.login(username, password).fold(
+            onSuccess = { token ->
+                repository.saveToken(token)
+                repository.saveUsername(username)
+            },
+            onFailure = { error ->
+                Log.e("MainActivity", "Auto-login failed: ${error.message}")
+            }
+        )
     }
 
     private suspend fun checkPermissionsAndSetContent(
@@ -54,52 +79,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                var isLoggedIn by remember { mutableStateOf(repository.isLoggedIn()) }
-                var authError by remember { mutableStateOf<String?>(null) }
-                var authLoading by remember { mutableStateOf(false) }
-
-                if (!isLoggedIn) {
-                    LoginScreen(
-                        onLogin = { username, password ->
-                            lifecycleScope.launch {
-                                authLoading = true
-                                authError = null
-                                syncService.login(username, password).fold(
-                                    onSuccess = { token ->
-                                        repository.saveToken(token)
-                                        repository.saveUsername(username)
-                                        isLoggedIn = true
-                                    },
-                                    onFailure = { authError = "Login failed: ${it.message}" }
-                                )
-                                authLoading = false
-                            }
-                        },
-                        onRegister = { username, password ->
-                            lifecycleScope.launch {
-                                authLoading = true
-                                authError = null
-                                syncService.register(username, password).fold(
-                                    onSuccess = {
-                                        // Auto-login after registration
-                                        syncService.login(username, password).fold(
-                                            onSuccess = { token ->
-                                                repository.saveToken(token)
-                                                repository.saveUsername(username)
-                                                isLoggedIn = true
-                                            },
-                                            onFailure = { authError = "Registration succeeded but login failed" }
-                                        )
-                                    },
-                                    onFailure = { authError = "Registration failed: ${it.message}" }
-                                )
-                                authLoading = false
-                            }
-                        },
-                        errorMessage = authError,
-                        isLoading = authLoading
-                    )
-                } else if (!hasPerms) {
+                if (!hasPerms) {
                     PermissionsScreen(
                         onRequestPermissions = { onRequestPermissions?.invoke() }
                     )
