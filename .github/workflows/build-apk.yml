@@ -20,8 +20,10 @@ jobs:
 
       - name: Install Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-disabled: true
+
+      - name: Generate Gradle wrapper
+        working-directory: android
+        run: gradle wrapper --gradle-version 8.9 --distribution-type bin
 
       - name: Build debug APK
         working-directory: android
