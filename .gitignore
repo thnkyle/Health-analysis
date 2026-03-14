@@ -1,0 +1,11 @@
+*.db
+*.pyc
+__pycache__/
+.pytest_cache/
+*.egg-info/
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+.DS_Store
