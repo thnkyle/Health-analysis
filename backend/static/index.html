@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Health Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0f1117;
+            --card: #1a1d27;
+            --border: #2a2d3a;
+            --text: #e4e4e7;
+            --muted: #9ca3af;
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 4px; }
+        h2 { font-size: 1.1rem; margin-bottom: 12px; color: var(--muted); font-weight: 400; }
+        h3 { font-size: 1rem; margin-bottom: 8px; }
+
+        .header { padding: 8px 0 16px; }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--accent-light);
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            width: 100%;
+        }
+        .btn:active { opacity: 0.7; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn-sm { padding: 8px 14px; font-size: 0.8rem; width: auto; }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--card);
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+        }
+        .tab {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            color: var(--muted);
+            border: none;
+            background: transparent;
+        }
+        .tab.active { background: var(--accent); color: white; }
+
+        .chart-container {
+            position: relative;
+            height: 220px;
+            margin-top: 8px;
+        }
+
+        .anomaly-item {
+            padding: 12px;
+            border-left: 3px solid var(--warning);
+            margin-bottom: 8px;
+            background: rgba(245, 158, 11, 0.05);
+            border-radius: 0 8px 8px 0;
+        }
+        .anomaly-item.severe { border-left-color: var(--danger); background: rgba(239, 68, 68, 0.05); }
+        .anomaly-type { font-weight: 600; font-size: 0.85rem; }
+        .anomaly-detail { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .upload-zone:active { border-color: var(--accent); }
+        .upload-zone p { color: var(--muted); font-size: 0.85rem; margin-top: 8px; }
+
+        input[type="file"] { display: none; }
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+        label { font-size: 0.8rem; color: var(--muted); display: block; margin-bottom: 4px; }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--success);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            z-index: 100;
+            display: none;
+        }
+        .toast.error { background: var(--danger); }
+
+        .nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card);
+            border-top: 1px solid var(--border);
+            display: flex;
+            padding: 8px 0;
+            z-index: 50;
+        }
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 6px;
+            font-size: 0.7rem;
+            color: var(--muted);
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+        .nav-item.active { color: var(--accent-light); }
+        .nav-icon { font-size: 1.2rem; display: block; margin-bottom: 2px; }
+
+        .page { display: none; }
+        .page.active { display: block; }
+
+        .empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+
+        .sample-btn-row { display: flex; gap: 8px; margin-top: 12px; }
+    </style>
+</head>
+<body>
+
+<div id="page-dashboard" class="page active">
+    <div class="header">
+        <h1>Health Analysis</h1>
+        <h2 id="dash-subtitle">Dashboard</h2>
+    </div>
+
+    <div class="stats-grid" id="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="stat-steps">--</div><div class="stat-label">Steps</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-hr">--</div><div class="stat-label">Avg HR</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-sleep">--</div><div class="stat-label">Sleep (hrs)</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-weight">--</div><div class="stat-label">Weight</div></div>
+    </div>
+
+    <div class="card">
+        <h3>Trends</h3>
+        <div class="tabs" id="trend-tabs">
+            <button class="tab active" data-type="steps">Steps</button>
+            <button class="tab" data-type="heart_rate">Heart Rate</button>
+            <button class="tab" data-type="sleep">Sleep</button>
+            <button class="tab" data-type="weight">Weight</button>
+        </div>
+        <div class="tabs" id="granularity-tabs">
+            <button class="tab active" data-gran="daily">Daily</button>
+            <button class="tab" data-gran="weekly">Weekly</button>
+            <button class="tab" data-gran="monthly">Monthly</button>
+        </div>
+        <div class="chart-container">
+            <canvas id="trend-chart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div id="page-anomalies" class="page">
+    <div class="header">
+        <h1>Anomalies</h1>
+        <h2>Unusual patterns in your data</h2>
+    </div>
+    <div id="anomaly-list">
+        <div class="empty">No anomalies detected yet. Add some data first.</div>
+    </div>
+</div>
+
+<div id="page-data" class="page">
+    <div class="header">
+        <h1>Add Data</h1>
+        <h2>Import or enter health records</h2>
+    </div>
+
+    <div class="card">
+        <h3>Upload CSV/JSON</h3>
+        <div class="upload-zone" id="upload-zone">
+            <div style="font-size: 2rem;">+</div>
+            <p>Tap to select a file</p>
+            <p style="font-size: 0.75rem; margin-top: 4px;">CSV: columns data_type, value, unit, recorded_at<br>JSON: array of records</p>
+        </div>
+        <input type="file" id="file-input" accept=".csv,.json">
+    </div>
+
+    <div class="card">
+        <h3>Manual Entry</h3>
+        <label>Data Type</label>
+        <select id="entry-type">
+            <option value="steps">Steps</option>
+            <option value="heart_rate">Heart Rate</option>
+            <option value="weight">Weight</option>
+            <option value="sleep">Sleep (minutes)</option>
+            <option value="calories">Calories</option>
+            <option value="blood_pressure_systolic">Blood Pressure (Systolic)</option>
+            <option value="blood_pressure_diastolic">Blood Pressure (Diastolic)</option>
+            <option value="body_temperature">Body Temperature</option>
+            <option value="distance">Distance (meters)</option>
+        </select>
+        <label>Value</label>
+        <input type="text" id="entry-value" placeholder="e.g. 8500" inputmode="decimal">
+        <button class="btn btn-primary" onclick="submitManualEntry()">Add Record</button>
+    </div>
+
+    <div class="card">
+        <h3>Load Sample Data</h3>
+        <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 8px;">Generate 30 days of realistic sample data to explore the dashboard.</p>
+        <button class="btn btn-outline" onclick="loadSampleData()">Generate Sample Data</button>
+    </div>
+</div>
+
+<div id="page-settings" class="page">
+    <div class="header">
+        <h1>Settings</h1>
+        <h2>Configuration</h2>
+    </div>
+    <div class="card">
+        <label>User ID</label>
+        <input type="text" id="setting-userid" value="default_user">
+        <label>Records in database</label>
+        <div id="record-count" style="font-size: 1.2rem; font-weight: 600; margin-bottom: 12px;">--</div>
+        <button class="btn btn-outline" onclick="refreshRecordCount()">Refresh Count</button>
+    </div>
+</div>
+
+<nav class="nav">
+    <button class="nav-item active" data-page="dashboard"><span class="nav-icon">&#9776;</span>Dashboard</button>
+    <button class="nav-item" data-page="anomalies"><span class="nav-icon">&#9888;</span>Anomalies</button>
+    <button class="nav-item" data-page="data"><span class="nav-icon">&#43;</span>Data</button>
+    <button class="nav-item" data-page="settings"><span class="nav-icon">&#9881;</span>Settings</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let userId = 'default_user';
+let currentTrendType = 'steps';
+let currentGranularity = 'daily';
+let trendChart = null;
+
+const UNITS = {
+    steps: 'count', heart_rate: 'bpm', weight: 'kg', sleep: 'minutes',
+    calories: 'kcal', blood_pressure_systolic: 'mmHg', blood_pressure_diastolic: 'mmHg',
+    body_temperature: 'celsius', distance: 'meters'
+};
+
+// Navigation
+document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('page-' + btn.dataset.page).classList.add('active');
+        if (btn.dataset.page === 'dashboard') loadDashboard();
+        if (btn.dataset.page === 'anomalies') loadAnomalies();
+        if (btn.dataset.page === 'settings') refreshRecordCount();
+    });
+});
+
+// Trend tabs
+document.querySelectorAll('#trend-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('#trend-tabs .tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentTrendType = tab.dataset.type;
+        loadTrends();
+    });
+});
+document.querySelectorAll('#granularity-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('#granularity-tabs .tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentGranularity = tab.dataset.gran;
+        loadTrends();
+    });
+});
+
+// File upload
+document.getElementById('upload-zone').addEventListener('click', () => document.getElementById('file-input').click());
+document.getElementById('file-input').addEventListener('change', handleFileUpload);
+
+function toast(msg, isError = false) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast' + (isError ? ' error' : '');
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 3000);
+}
+
+async function apiPost(path, body) {
+    const res = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+async function apiGet(path) {
+    const res = await fetch(API + path);
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+async function loadDashboard() {
+    userId = document.getElementById('setting-userid').value || 'default_user';
+    try {
+        const records = await apiGet(`/api/v1/records?user_id=${userId}&limit=1000`);
+        if (records.length === 0) {
+            document.getElementById('dash-subtitle').textContent = 'No data yet — add some records';
+            return;
+        }
+        document.getElementById('dash-subtitle').textContent = `${records.length} records`;
+
+        const latest = {};
+        const avgCalc = {};
+        records.forEach(r => {
+            if (!latest[r.data_type] || r.recorded_at > latest[r.data_type].recorded_at) {
+                latest[r.data_type] = r;
+            }
+            if (!avgCalc[r.data_type]) avgCalc[r.data_type] = { sum: 0, count: 0 };
+            avgCalc[r.data_type].sum += r.value;
+            avgCalc[r.data_type].count++;
+        });
+
+        const avg = (type) => avgCalc[type] ? Math.round(avgCalc[type].sum / avgCalc[type].count) : '--';
+        const last = (type) => latest[type] ? Math.round(latest[type].value * 10) / 10 : '--';
+
+        document.getElementById('stat-steps').textContent = last('steps');
+        document.getElementById('stat-hr').textContent = avg('heart_rate');
+        document.getElementById('stat-sleep').textContent = avgCalc['sleep'] ? (avgCalc['sleep'].sum / avgCalc['sleep'].count / 60).toFixed(1) : '--';
+        document.getElementById('stat-weight').textContent = last('weight');
+
+        loadTrends();
+    } catch (e) {
+        toast('Failed to load: ' + e.message, true);
+    }
+}
+
+async function loadTrends() {
+    userId = document.getElementById('setting-userid').value || 'default_user';
+    try {
+        const data = await apiGet(`/api/v1/trends/${currentTrendType}?user_id=${userId}&granularity=${currentGranularity}`);
+        renderTrendChart(data);
+    } catch (e) { /* silent */ }
+}
+
+function renderTrendChart(data) {
+    const ctx = document.getElementById('trend-chart').getContext('2d');
+    if (trendChart) trendChart.destroy();
+
+    const labels = data.trends.map(t => t.period.slice(5));
+    const values = data.trends.map(t => t.avg);
+
+    trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: data.data_type,
+                data: values,
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 3,
+                pointBackgroundColor: '#818cf8',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: '#9ca3af', maxTicksLimit: 7, font: { size: 10 } }, grid: { color: '#2a2d3a' } },
+                y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: '#2a2d3a' } }
+            }
+        }
+    });
+}
+
+async function loadAnomalies() {
+    userId = document.getElementById('setting-userid').value || 'default_user';
+    try {
+        const data = await apiGet(`/api/v1/anomalies?user_id=${userId}`);
+        const container = document.getElementById('anomaly-list');
+        if (data.total === 0) {
+            container.innerHTML = '<div class="empty">No anomalies detected. Your data looks normal.</div>';
+            return;
+        }
+        container.innerHTML = data.anomalies.map(a => `
+            <div class="anomaly-item ${a.z_score > 3 ? 'severe' : ''}">
+                <div class="anomaly-type">${a.data_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+                <div class="anomaly-detail">${a.message}</div>
+                <div class="anomaly-detail">${new Date(a.recorded_at).toLocaleString()}</div>
+            </div>
+        `).join('');
+    } catch (e) {
+        toast('Failed to load anomalies', true);
+    }
+}
+
+async function submitManualEntry() {
+    userId = document.getElementById('setting-userid').value || 'default_user';
+    const dataType = document.getElementById('entry-type').value;
+    const value = parseFloat(document.getElementById('entry-value').value);
+    if (isNaN(value)) { toast('Enter a valid number', true); return; }
+
+    try {
+        await apiPost('/api/v1/sync', {
+            records: [{
+                user_id: userId,
+                data_type: dataType,
+                value: value,
+                unit: UNITS[dataType] || 'unit',
+                recorded_at: new Date().toISOString()
+            }]
+        });
+        document.getElementById('entry-value').value = '';
+        toast('Record added');
+    } catch (e) {
+        toast('Error: ' + e.message, true);
+    }
+}
+
+async function handleFileUpload(e) {
+    userId = document.getElementById('setting-userid').value || 'default_user';
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    let records = [];
+
+    try {
+        if (file.name.endsWith('.json')) {
+            const parsed = JSON.parse(text);
+            records = (Array.isArray(parsed) ? parsed : parsed.records || []).map(r => ({
+                user_id: r.user_id || userId,
+                data_type: r.data_type || r.type,
+                value: parseFloat(r.value),
+                unit: r.unit || UNITS[r.data_type || r.type] || 'unit',
+                recorded_at: r.recorded_at || r.timestamp || new Date().toISOString()
+            }));
+        } else {
+            const lines = text.trim().split('\n');
+            const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',').map(c => c.trim());
+                const row = {};
+                header.forEach((h, j) => row[h] = cols[j]);
+                records.push({
+                    user_id: row.user_id || userId,
+                    data_type: row.data_type || row.type,
+                    value: parseFloat(row.value),
+                    unit: row.unit || UNITS[row.data_type || row.type] || 'unit',
+                    recorded_at: row.recorded_at || row.timestamp || new Date().toISOString()
+                });
+            }
+        }
+
+        if (records.length === 0) { toast('No records found in file', true); return; }
+        const result = await apiPost('/api/v1/sync', { records });
+        toast(`Imported ${result.inserted} records`);
+        e.target.value = '';
+    } catch (err) {
+        toast('Import error: ' + err.message, true);
+    }
+}
+
+async function loadSampleData() {
+    userId = document.getElementById('setting-userid').value || 'default_user';
+    const records = [];
+    const now = Date.now();
+
+    for (let d = 29; d >= 0; d--) {
+        const date = new Date(now - d * 86400000);
+        const iso = date.toISOString();
+
+        records.push({ user_id: userId, data_type: 'steps', value: 5000 + Math.random() * 10000, unit: 'count', recorded_at: iso });
+        records.push({ user_id: userId, data_type: 'heart_rate', value: 60 + Math.random() * 30, unit: 'bpm', recorded_at: iso });
+        records.push({ user_id: userId, data_type: 'sleep', value: 300 + Math.random() * 240, unit: 'minutes', recorded_at: iso });
+        records.push({ user_id: userId, data_type: 'weight', value: 70 + Math.random() * 5 - 2.5, unit: 'kg', recorded_at: iso });
+        records.push({ user_id: userId, data_type: 'calories', value: 1500 + Math.random() * 1000, unit: 'kcal', recorded_at: iso });
+
+        if (d === 3) {
+            records.push({ user_id: userId, data_type: 'heart_rate', value: 175, unit: 'bpm', recorded_at: iso });
+        }
+    }
+
+    try {
+        const result = await apiPost('/api/v1/sync', { records });
+        toast(`Generated ${result.inserted} sample records`);
+        loadDashboard();
+    } catch (e) {
+        toast('Error: ' + e.message, true);
+    }
+}
+
+async function refreshRecordCount() {
+    userId = document.getElementById('setting-userid').value || 'default_user';
+    try {
+        const records = await apiGet(`/api/v1/records?user_id=${userId}&limit=1000`);
+        document.getElementById('record-count').textContent = records.length;
+    } catch (e) {
+        document.getElementById('record-count').textContent = 'Error';
+    }
+}
+
+// Initial load
+loadDashboard();
+</script>
+</body>
+</html>

@@ -1,6 +1,9 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from database import init_db
 from routers import analysis, ingest
@@ -21,6 +24,14 @@ app = FastAPI(
 
 app.include_router(ingest.router, prefix="/api/v1", tags=["ingest"])
 app.include_router(analysis.router, prefix="/api/v1", tags=["analysis"])
+
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+
+@app.get("/")
+def root():
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
 
 @app.get("/api/v1/health")
