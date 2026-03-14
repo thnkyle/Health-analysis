@@ -11,9 +11,9 @@ echo ""
 echo "[1/5] Updating Termux packages..."
 pkg update -y && pkg upgrade -y
 
-# Install Python
-echo "[2/5] Installing Python..."
-pkg install -y python git
+# Install Python + scientific packages via pkg (NOT pip — pip builds from source and hangs)
+echo "[2/5] Installing Python and dependencies..."
+pkg install -y python git python-numpy python-pandas
 
 # Clone the repo (skip if already cloned)
 echo "[3/5] Getting the project..."
@@ -26,10 +26,10 @@ fi
 
 cd "$HOME/Health-analysis/backend"
 
-# Install Python dependencies
+# Install remaining Python dependencies via pip (these are pure Python, install fast)
 echo "[4/5] Installing Python dependencies..."
 pip install --upgrade pip
-pip install fastapi uvicorn sqlalchemy pydantic pandas numpy
+pip install fastapi uvicorn sqlalchemy pydantic
 
 # Start the server
 echo ""
