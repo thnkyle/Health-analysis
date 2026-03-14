@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'android/**'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 jobs:
@@ -17,13 +18,13 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v3
-        with:
-          cache-disabled: true
+      - name: Setup Gradle wrapper
+        working-directory: android
+        run: gradle wrapper --gradle-version 8.7
 
       - name: Build debug APK
         working-directory: android
-        run: gradle assembleDebug
+        run: ./gradlew assembleDebug --no-daemon --no-build-cache
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
